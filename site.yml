@@ -1,0 +1,8 @@
+- name: Baseline system policy + time sync
+  hosts: managed_nodes
+  gather_facts: true
+  become: true
+
+  roles:
+    - apt_policy
+    - time_sync

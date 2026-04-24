@@ -1,0 +1,89 @@
+- name: Ensure Debian-family only
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family == "Debian"
+    fail_msg: "This apt_policy role currently supports Debian/Ubuntu only."
+    success_msg: "All assertions passed"
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Set known unit list
+  ansible.builtin.set_fact:
+    apt_policy_known_units: "{{ ansible_facts.services.keys() | list }}"
+
+- name: Stop apt timers now if present
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: stopped
+  loop:
+    - apt-daily.timer
+    - apt-daily-upgrade.timer
+  when: item in apt_policy_known_units
+
+- name: Disable and mask apt timers permanently if present
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    masked: true
+    state: stopped
+  loop:
+    - apt-daily.timer
+    - apt-daily-upgrade.timer
+  when: item in apt_policy_known_units
+
+- name: Stop apt background services now if present
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: stopped
+  loop:
+    - apt-daily.service
+    - apt-daily-upgrade.service
+    - unattended-upgrades.service
+  when: item in apt_policy_known_units
+
+- name: Disable apt background services if present
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    masked: false
+    state: stopped
+  loop:
+    - apt-daily.service
+    - apt-daily-upgrade.service
+    - unattended-upgrades.service
+  when: item in apt_policy_known_units
+
+- name: Disable periodic auto-upgrades config
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/10periodic
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      APT::Periodic::Enable "0";
+      APT::Periodic::Update-Package-Lists "0";
+      APT::Periodic::Download-Upgradeable-Packages "0";
+      APT::Periodic::AutocleanInterval "0";
+      APT::Periodic::Unattended-Upgrade "0";
+  when: apt_policy_write_10periodic | bool
+
+- name: Disable periodic download config (optional)
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "0";
+      APT::Periodic::Unattended-Upgrade "0";
+  when: apt_policy_disable_periodic_download | default(true) | bool
+
+- name: Purge unattended-upgrades package (optional)
+  ansible.builtin.apt:
+    name: unattended-upgrades
+    state: absent
+    purge: true
+    autoremove: true
+    update_cache: false
+  when: apt_policy_purge_unattended_upgrades | bool

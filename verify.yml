@@ -1,0 +1,8 @@
+- name: Verify time sync on managed nodes
+  hosts: managed_nodes
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Include verify tasks
+      ansible.builtin.include_tasks: roles/time_sync/tasks/verify.yml

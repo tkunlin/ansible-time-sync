@@ -1,0 +1,11 @@
+apt_policy_write_10periodic: true
+apt_policy_disable_periodic_download: true
+apt_policy_purge_unattended_upgrades: true
+
+time_zone: "Asia/Taipei"
+
+chrony_makestep_threshold: 1.0
+chrony_makestep_updates: 3
+
+chrony_time_servers:
+  - "10.88.0.23"

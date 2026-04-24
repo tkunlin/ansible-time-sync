@@ -1,0 +1,150 @@
+---
+- name: Verify apt policy (permanently disable background updates)
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    apt_policy_timers:
+      - apt-daily.timer
+      - apt-daily-upgrade.timer
+
+    # 這些只驗證「不在 active」
+    apt_policy_services_active_check:
+      - apt-daily.service
+      - apt-daily-upgrade.service
+      - unattended-upgrades.service
+
+    # 若你未來選擇 purge unattended-upgrades 套件，可改 true
+    apt_policy_allow_not_found: false
+
+  tasks:
+    - name: Ensure Debian-family only
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.os_family == "Debian"
+        fail_msg: "This verification playbook supports Debian/Ubuntu only."
+      changed_when: false
+
+    # -------------------------
+    # 1) Verify timers are masked (UnitFileState)
+    # -------------------------
+    - name: Read timers UnitFileState
+      ansible.builtin.command: "systemctl show -p UnitFileState --value {{ item }}"
+      register: timer_unitfilestate
+      changed_when: false
+      failed_when: false
+      loop: "{{ apt_policy_timers }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Assert timers UnitFileState is masked
+      ansible.builtin.assert:
+        that:
+          - >
+            (item.rc == 0 and (item.stdout | trim) == 'masked')
+            or
+            (apt_policy_allow_not_found and item.rc != 0)
+        fail_msg: >-
+          Timer {{ item.item }} is not masked (UnitFileState).
+          rc={{ item.rc }}, UnitFileState="{{ item.stdout | trim }}", stderr="{{ item.stderr | default('') | trim }}"
+      loop: "{{ timer_unitfilestate.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      changed_when: false
+
+    # -------------------------
+    # 2) Verify services are not active (ActiveState)
+    # -------------------------
+    - name: Read services ActiveState
+      ansible.builtin.command: "systemctl show -p ActiveState --value {{ item }}"
+      register: svc_activestate
+      changed_when: false
+      failed_when: false
+      loop: "{{ apt_policy_services_active_check }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Assert services ActiveState is inactive
+      ansible.builtin.assert:
+        that:
+          - >
+            (item.rc == 0 and (item.stdout | trim) == 'inactive')
+            or
+            (apt_policy_allow_not_found and item.rc != 0)
+        fail_msg: >-
+          Service {{ item.item }} is not inactive (ActiveState).
+          rc={{ item.rc }}, ActiveState="{{ item.stdout | trim }}", stderr="{{ item.stderr | default('') | trim }}"
+      loop: "{{ svc_activestate.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      changed_when: false
+
+    # -------------------------
+    # 3) Verify unattended-upgrades service is disabled/masked (UnitFileState)
+    #    (你要求的 Q2：同樣用 UnitFileState 避免 rc 語意差異)
+    # -------------------------
+    - name: Read unattended-upgrades UnitFileState
+      ansible.builtin.command: "systemctl show -p UnitFileState --value unattended-upgrades.service"
+      register: uu_unitfilestate
+      changed_when: false
+      failed_when: false
+
+    - name: Assert unattended-upgrades UnitFileState is disabled or masked
+      ansible.builtin.assert:
+        that:
+          - >
+            (uu_unitfilestate.rc == 0 and (uu_unitfilestate.stdout | trim) in ['disabled', 'masked'])
+            or
+            (apt_policy_allow_not_found and uu_unitfilestate.rc != 0)
+        fail_msg: >-
+          unattended-upgrades.service is not disabled/masked (UnitFileState).
+          rc={{ uu_unitfilestate.rc }}, UnitFileState="{{ uu_unitfilestate.stdout | trim }}",
+          stderr="{{ uu_unitfilestate.stderr | default('') | trim }}"
+      changed_when: false
+
+    # -------------------------
+    # 4) Verify apt periodic config files
+    # -------------------------
+    - name: Read /etc/apt/apt.conf.d/20auto-upgrades
+      ansible.builtin.slurp:
+        src: /etc/apt/apt.conf.d/20auto-upgrades
+      register: au20
+      changed_when: false
+
+    - name: Assert 20auto-upgrades is set to 0/0
+      ansible.builtin.assert:
+        that:
+          - "'APT::Periodic::Update-Package-Lists \"0\";' in (au20.content | b64decode)"
+          - "'APT::Periodic::Unattended-Upgrade \"0\";' in (au20.content | b64decode)"
+        fail_msg: >-
+          /etc/apt/apt.conf.d/20auto-upgrades does not contain expected settings.
+          Content:
+          {{ au20.content | b64decode }}
+      changed_when: false
+
+    - name: Stat /etc/apt/apt.conf.d/10periodic
+      ansible.builtin.stat:
+        path: /etc/apt/apt.conf.d/10periodic
+      register: periodic10_stat
+      changed_when: false
+
+    - name: Read /etc/apt/apt.conf.d/10periodic (if exists)
+      ansible.builtin.slurp:
+        src: /etc/apt/apt.conf.d/10periodic
+      register: periodic10
+      when: periodic10_stat.stat.exists
+      changed_when: false
+
+    - name: Assert 10periodic disables periodic actions (if exists)
+      ansible.builtin.assert:
+        that:
+          - "'APT::Periodic::Update-Package-Lists \"0\";' in (periodic10.content | b64decode)"
+          - "'APT::Periodic::Download-Upgradeable-Packages \"0\";' in (periodic10.content | b64decode)"
+          - "'APT::Periodic::AutocleanInterval \"0\";' in (periodic10.content | b64decode)"
+        fail_msg: >-
+          /etc/apt/apt.conf.d/10periodic exists but does not contain expected settings.
+          Content:
+          {{ periodic10.content | b64decode }}
+      when: periodic10_stat.stat.exists
+      changed_when: false

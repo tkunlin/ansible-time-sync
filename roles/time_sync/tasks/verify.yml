@@ -1,0 +1,35 @@
+- name: Set primary chrony server
+  ansible.builtin.set_fact:
+    chrony_primary_server: "{{ chrony_time_servers[0] }}"
+
+- name: Verify chrony sources (numeric)
+  ansible.builtin.command: chronyc -n sources
+  register: chrony_sources
+  changed_when: false
+
+- name: Verify chrony tracking
+  ansible.builtin.command: chronyc tracking
+  register: chrony_tracking
+  changed_when: false
+
+- name: Assert chrony is using expected time server
+  ansible.builtin.assert:
+    that:
+      - chrony_primary_server in chrony_sources.stdout
+      - chrony_sources.stdout is regex('(?m)^\\^\\*\\s+' ~ chrony_primary_server ~ '\\s')
+    fail_msg: |
+      Chrony is not synced to expected server {{ chrony_primary_server }}.
+      Current sources:
+      {{ chrony_sources.stdout }}
+    success_msg: |
+      Chrony looks OK.
+      Current sources:
+
+      {{ chrony_sources.stdout }}
+
+- name: Show chrony tracking summary
+  ansible.builtin.debug:
+    msg: |
+      Tracking summary for {{ inventory_hostname }}:
+
+      {{ chrony_tracking.stdout }}

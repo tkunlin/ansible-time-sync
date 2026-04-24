@@ -1,0 +1,15 @@
+# Managed by Ansible
+
+driftfile /var/lib/chrony/chrony.drift
+ntsdumpdir /var/lib/chrony
+logdir /var/log/chrony
+
+{% for server in chrony_time_servers %}
+server {{ server }} iburst{% if loop.first %} prefer{% endif %}
+{% endfor %}
+
+makestep {{ chrony_makestep_threshold }} {{ chrony_makestep_updates }}
+rtcsync
+
+keyfile /etc/chrony/chrony.keys
+leapsectz right/UTC

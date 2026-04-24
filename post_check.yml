@@ -1,0 +1,56 @@
+- name: Post-check time sync and related services
+  hosts: managed_nodes
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Detect chrony service name
+      ansible.builtin.set_fact:
+        chrony_service_name: "{{ 'chrony' if ansible_os_family == 'Debian' else 'chronyd' }}"
+
+    - name: Read timezone
+      ansible.builtin.command: timedatectl show -p Timezone --value
+      register: timezone_out
+      changed_when: false
+
+    - name: Check chrony active state
+      ansible.builtin.command: systemctl is-active {{ chrony_service_name }}
+      register: chrony_active
+      changed_when: false
+      failed_when: false
+
+    - name: Check chrony enabled state
+      ansible.builtin.command: systemctl is-enabled {{ chrony_service_name }}
+      register: chrony_enabled
+      changed_when: false
+      failed_when: false
+
+    - name: Read chrony sources
+      ansible.builtin.command: chronyc -n sources
+      register: chrony_sources
+      changed_when: false
+      failed_when: false
+
+    - name: Read chrony tracking
+      ansible.builtin.command: chronyc tracking
+      register: chrony_tracking
+      changed_when: false
+      failed_when: false
+
+    - name: Show post-check summary
+      ansible.builtin.debug:
+        msg: |
+          ==================================================
+          Host      : {{ inventory_hostname }}
+          IP        : {{ ansible_host | default('N/A') }}
+          Timezone  : {{ timezone_out.stdout }}
+          Service   : {{ chrony_service_name }}
+          Enabled   : {{ chrony_enabled.stdout | default('unknown') }}
+          Active    : {{ chrony_active.stdout | default('unknown') }}
+
+          [chronyc tracking]
+          {{ chrony_tracking.stdout | default('N/A') }}
+
+          [chronyc -n sources]
+          {{ chrony_sources.stdout | default('N/A') }}
+          ==================================================
