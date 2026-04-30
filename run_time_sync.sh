@@ -56,16 +56,8 @@ run_ping_test() {
   ansible -i "${INVENTORY_FILE}" "${GROUP_NAME}" -m ping
 }
 
-run_site() {
-  ansible-playbook -i "${INVENTORY_FILE}" -b -K site.yml
-}
-
-run_verify() {
-  ansible-playbook -i "${INVENTORY_FILE}" -b -K verify.yml
-}
-
-run_post_check() {
-  ansible-playbook -i "${INVENTORY_FILE}" -b -K post_check.yml
+run_all_playbooks() {
+  ansible-playbook -i "${INVENTORY_FILE}" -b -K site.yml verify.yml post_check.yml
 }
 
 main() {
@@ -77,9 +69,7 @@ main() {
   echo "User : ${REMOTE_USER}"
 
   run_ping_test
-  run_site
-  run_verify
-  run_post_check
+  run_all_playbooks
 }
 
 main "$@"
