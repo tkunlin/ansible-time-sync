@@ -1,6 +1,6 @@
 # ansible-time-sync
 
-## 安裝 Ansible（控制端, 若已安裝可忽略
+## 安裝 Ansible（控制端, 若已安裝可忽略)
 ```
 sudo apt update
 sudo apt install -y ansible
