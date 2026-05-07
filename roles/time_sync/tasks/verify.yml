@@ -2,6 +2,14 @@
   ansible.builtin.set_fact:
     chrony_primary_server: "{{ chrony_time_servers[0] }}"
 
+# 重要：
+# 不要一進 verify 就立刻要求 sources 變成 ^*。
+# Chrony 剛 restart 後需要一點時間完成初始量測與選源。
+- name: Wait for chrony to synchronize
+  ansible.builtin.command: chronyc waitsync 30 0.05 0 5
+  register: chrony_waitsync
+  changed_when: false
+
 - name: Verify chrony sources (numeric)
   ansible.builtin.command: chronyc -n sources
   register: chrony_sources
@@ -17,15 +25,31 @@
     that:
       - chrony_primary_server in chrony_sources.stdout
       - chrony_sources.stdout is regex('(?m)^\\^\\*\\s+' ~ chrony_primary_server ~ '\\s')
+      - chrony_tracking.stdout is regex('(?m)^Leap status\\s+:\\s+Normal\\s*$')
     fail_msg: |
-      Chrony is not synced to expected server {{ chrony_primary_server }}.
-      Current sources:
-      {{ chrony_sources.stdout }}
-    success_msg: |
-      Chrony looks OK.
-      Current sources:
+      Chrony is not fully synced to expected server {{ chrony_primary_server }}.
 
+      Expected:
+        - chronyc sources should contain: ^* {{ chrony_primary_server }}
+        - chronyc tracking should show: Leap status : Normal
+
+      Current waitsync output:
+      {{ chrony_waitsync.stdout | default('') }}
+
+      Current sources:
       {{ chrony_sources.stdout }}
+
+      Current tracking:
+      {{ chrony_tracking.stdout }}
+
+    success_msg: |
+      Chrony looks OK on {{ inventory_hostname }}.
+
+      Current sources:
+      {{ chrony_sources.stdout }}
+
+      Current tracking:
+      {{ chrony_tracking.stdout }}
 
 - name: Show chrony tracking summary
   ansible.builtin.debug:

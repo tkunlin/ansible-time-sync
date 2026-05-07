@@ -4,8 +4,9 @@
   changed_when: false
 
 - name: Set timezone via timedatectl
-  ansible.builtin.command: timedatectl set-timezone {{ time_zone }}
+  ansible.builtin.command: timedatectl set-timezone "{{ time_zone }}"
   when: current_timezone.stdout != time_zone
+  changed_when: true
 
 - name: Gather package facts on Debian/Ubuntu
   ansible.builtin.package_facts:
@@ -44,6 +45,17 @@
     group: root
     mode: "0644"
   notify: Restart chrony
+  when: ansible_os_family == "Debian"
+
+- name: Render chrony configuration on RHEL family
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: /etc/chrony.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart chrony
+  when: ansible_os_family == "RedHat"
 
 - name: Enable and start chrony on Debian/Ubuntu
   ansible.builtin.service:
@@ -59,10 +71,22 @@
     state: started
   when: ansible_os_family == "RedHat"
 
+# 重要：
+# 如果 chrony.conf 有變更，這裡要立刻執行 Restart chrony handler。
+# 避免後面 makestep 做完後，play 結束時才又 restart chrony。
+- name: Apply chrony restart immediately if config changed
+  ansible.builtin.meta: flush_handlers
+
+# 加速初始量測，不把失敗視為整個 playbook 失敗。
+# 有些環境剛啟動 chrony 時 burst 可能還沒 ready，所以 failed_when: false。
+- name: Ask chrony to burst initial measurements
+  ansible.builtin.command: chronyc -a 'burst 4/4'
+  register: chrony_burst
+  changed_when: false
+  failed_when: false
+
 - name: Force chrony to step once
   ansible.builtin.command: chronyc -a makestep
   register: chrony_makestep
   changed_when: false
   failed_when: false
-
-
