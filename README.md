@@ -7,15 +7,7 @@ sudo apt install -y ansible
 ansible --version
 ```
 
-
-Time Server 設定
-## 請在 group_vars/all.yml 設定
-```
-chrony_time_servers:
-  - "xxx.xxx.xxx.xxx"
-```
-
 執行
 ```
-./run_time_sync.sh
+./run_time_sync.sh --time-server 10.10.10.10 --time-zone Asia/Taipei
 ```

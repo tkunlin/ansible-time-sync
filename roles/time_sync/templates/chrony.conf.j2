@@ -1,15 +1,13 @@
-# Managed by Ansible
-
-driftfile /var/lib/chrony/chrony.drift
-ntsdumpdir /var/lib/chrony
-logdir /var/log/chrony
+# Managed by Ansible - time_sync role
 
 {% for server in chrony_time_servers %}
-server {{ server }} iburst{% if loop.first %} prefer{% endif %}
+server {{ server }} iburst
 {% endfor %}
 
-makestep {{ chrony_makestep_threshold }} {{ chrony_makestep_updates }}
+driftfile /var/lib/chrony/chrony.drift
+
+makestep {{ chrony_makestep_threshold | default(1.0) }} {{ chrony_makestep_updates | default(3) }}
+
 rtcsync
 
-keyfile /etc/chrony/chrony.keys
-leapsectz right/UTC
+logdir /var/log/chrony

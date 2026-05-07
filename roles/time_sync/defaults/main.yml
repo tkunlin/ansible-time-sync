@@ -1,0 +1,19 @@
+---
+# Default timezone.
+# Can be overridden by:
+#   ./run_time_sync.sh --time-zone Asia/Taipei
+time_zone: "Asia/Taipei"
+
+# Default Chrony makestep behavior.
+# makestep <threshold> <updates>
+#
+# 1.0 3 means:
+#   If the system clock offset is larger than 1.0 second,
+#   step the clock during the first 3 clock updates.
+chrony_makestep_threshold: 1.0
+chrony_makestep_updates: 3
+
+# Chrony/NTP servers.
+# 建議正式執行時由 run_time_sync.sh --time-server 傳入。
+# 這裡刻意留空，避免誤用 placeholder。
+chrony_time_servers: []

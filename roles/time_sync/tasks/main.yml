@@ -1,3 +1,26 @@
+- name: Validate time sync variables
+  ansible.builtin.assert:
+    that:
+      - time_zone is defined
+      - time_zone | length > 0
+      - chrony_time_servers is defined
+      - chrony_time_servers | length > 0
+      - "'xxx.xxx.xxx.xxx' not in chrony_time_servers"
+      - "'x.x.x.x' not in chrony_time_servers"
+    fail_msg: |
+      Invalid time sync variables.
+
+      Required:
+        time_zone must be defined.
+        chrony_time_servers must contain at least one real NTP server.
+
+      Example:
+        ./run_time_sync.sh --time-server 10.88.0.23 --time-zone Asia/Taipei
+
+      Current values:
+        time_zone={{ time_zone | default('UNDEFINED') }}
+        chrony_time_servers={{ chrony_time_servers | default('UNDEFINED') }}
+
 - name: Get current timezone
   ansible.builtin.command: timedatectl show -p Timezone --value
   register: current_timezone
