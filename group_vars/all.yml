@@ -8,4 +8,4 @@ chrony_makestep_threshold: 1.0
 chrony_makestep_updates: 3
 
 chrony_time_servers:
-  - "10.88.0.23"
+  - "xxx.xxx.xxx.xxx"
