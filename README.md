@@ -11,3 +11,8 @@ ansible --version
 ```
 ./run_time_sync.sh --time-server 10.10.10.10 --time-zone Asia/Taipei
 ```
+
+or
+```
+./run_time_sync.sh --user root --skip-ping --time-server 10.10.10.10 --time-zone Asia/Taipei
+```
